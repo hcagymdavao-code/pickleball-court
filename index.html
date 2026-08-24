@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="pickleballApp" ng-strict-di>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pickleball Scheduler</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Source+Sans+3:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/app.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%231b4332'/%3E%3Ccircle cx='32' cy='32' r='14' fill='%23d4e157'/%3E%3C/svg%3E"
+    />
+  </head>
+  <body ng-controller="SchedulerController as vm">
+    <header class="app-header">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="14" fill="#d4e157" />
+          <circle cx="32" cy="32" r="16" fill="#1b4332" />
+          <circle cx="32" cy="32" r="6" fill="#d4e157" />
+        </svg>
+        <div>
+          <h1>Pickleball Scheduler</h1>
+          <p>Pick a date, lock court times, and keep session notes.</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a
+          class="btn btn-ghost"
+          ng-href="{{ vm.spreadsheetUrl }}"
+          target="_blank"
+          rel="noopener"
+        >
+          Open Google Sheet
+        </a>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="card setup-card" ng-if="vm.accessError">
+        <h2>{{ vm.accessErrorTitle || 'Google Sheet update needed' }}</h2>
+        <p class="hint">{{ vm.accessError }}</p>
+      </section>
+
+      <section class="card date-card">
+        <div>
+          <h2>Select Date</h2>
+          <p class="hint">Choose month, day, and year to open that day’s court board.</p>
+        </div>
+        <div class="date-field">
+          <label for="schedule-date">Month + Day + Year</label>
+          <input
+            id="schedule-date"
+            type="date"
+            ng-model="vm.dateValue"
+            ng-change="vm.onDateChange()"
+          />
+        </div>
+        <div class="selected-date" ng-if="vm.selectedDateLabel">
+          <strong>{{ vm.selectedDateLabel }}</strong>
+          Click a court cell to reserve it. Add notes in the selected cell.
+        </div>
+      </section>
+
+      <section class="card board-card">
+        <div class="board-toolbar">
+          <div>
+            <h2>Court Times</h2>
+            <p class="hint">
+              6:00 AM through 5:59 AM. Court 1 is Left Wing. Court 2 is Right Wing.
+              Selected cells turn green.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="btn btn-primary"
+            ng-click="vm.requestSave()"
+            ng-disabled="!vm.selectedDateKey || !vm.sheetReady || vm.saving"
+          >
+            {{ vm.saving ? 'Saving…' : 'Save Schedule' }}
+          </button>
+        </div>
+
+        <p class="empty" ng-if="!vm.selectedDateKey">
+          Select a date first to highlight times and add notes.
+        </p>
+
+        <div class="table-wrap" ng-if="vm.selectedDateKey">
+          <table class="time-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th ng-repeat="court in vm.courts" class="court-head">
+                  {{ court.name }}
+                  <span>{{ court.wing }}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr ng-repeat="slot in vm.slots">
+                <td class="time-label">{{ slot.label }}</td>
+                <td
+                  ng-repeat="court in vm.courts"
+                  class="court-cell"
+                  ng-class="{ selected: slot.courts[court.id].selected }"
+                  ng-click="vm.toggleCourt(slot, court.id)"
+                >
+                  <input
+                    class="notes-input"
+                    type="text"
+                    ng-model="slot.courts[court.id].notes"
+                    ng-readonly="!slot.courts[court.id].selected"
+                    ng-click="vm.onCourtInputClick($event, slot, court.id)"
+                    placeholder="{{ slot.courts[court.id].selected ? 'Add notes' : 'Click to reserve' }}"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card saved-card">
+        <h2>Saved Schedules</h2>
+        <p class="hint">
+          Live data is stored in the
+          <a ng-href="{{ vm.spreadsheetUrl }}" target="_blank" rel="noopener">shared Google Sheet</a>.
+          The site reads that link directly. Each selected hour on one court becomes one row.
+        </p>
+        <p class="empty" ng-if="vm.loading">Loading schedules from Google Sheet…</p>
+        <p class="empty" ng-if="!vm.loading && !vm.groupedSchedules.length">
+          No schedules saved yet.
+        </p>
+        <div class="saved-list" ng-if="vm.groupedSchedules.length">
+          <article
+            class="saved-item"
+            ng-repeat="group in vm.groupedSchedules"
+          >
+            <h3>{{ group.label }}</h3>
+            <ul>
+              <li ng-repeat="item in group.items">
+                <strong>{{ item.courtLabel || 'Court ' + (item.court || '1') }}</strong>
+                · {{ item.timeLabel }}
+                <span ng-if="item.notes"> — {{ item.notes }}</span>
+              </li>
+            </ul>
+            <button
+              type="button"
+              class="btn btn-dark"
+              ng-click="vm.loadSavedDate(group.date)"
+            >
+              Edit Date
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger"
+              ng-click="vm.requestDeleteDate(group.date)"
+            >
+              Delete
+            </button>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <div
+      class="modal-backdrop"
+      ng-if="vm.confirmOpen"
+      ng-click="vm.closeModal()"
+    >
+      <div class="modal" ng-click="$event.stopPropagation()">
+        <h3>Password Confirmation</h3>
+        <p>Enter the admin password to confirm this change.</p>
+        <input
+          id="confirm-password"
+          type="password"
+          ng-model="vm.password"
+          ng-keyup="$event.keyCode === 13 && vm.confirmPassword()"
+          placeholder="Password"
+        />
+        <p class="modal-error">{{ vm.passwordError }}</p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline" ng-click="vm.closeModal()">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-primary" ng-click="vm.confirmPassword()">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" ng-if="vm.toast">{{ vm.toast }}</div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.3/angular.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
