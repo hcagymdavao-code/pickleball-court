@@ -19,17 +19,14 @@
   <body ng-controller="SchedulerController as vm">
     <header class="app-header">
       <div class="brand">
-        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
-          <rect width="64" height="64" rx="14" fill="#d4e157" />
-          <circle cx="32" cy="32" r="16" fill="#1b4332" />
-          <circle cx="32" cy="32" r="6" fill="#d4e157" />
-        </svg>
+        <img src="images/logo.webp" alt="logo" width="50" height="50" />
+
         <div>
           <h1>Pickleball Scheduler</h1>
-          <p>Pick a date, lock court times, and keep session notes.</p>
+          <p>San Antonio de Padua Court</p>
         </div>
       </div>
-      <div class="header-actions">
+      <div class="header-actions" style="display: none;">
         <a
           class="btn btn-ghost"
           ng-href="{{ vm.spreadsheetUrl }}"
