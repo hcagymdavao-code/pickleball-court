@@ -49,6 +49,7 @@
       vm.groupedSchedules = [];
       vm.saving = false;
       vm.loading = false;
+      vm.savedSchedulesEnabled = false;
       vm.sheetReady = !!SPREADSHEET_URL;
       vm.accessError = "";
       vm.accessErrorTitle = "";
@@ -67,13 +68,20 @@
       boot();
 
       function boot() {
-        if (!SPREADSHEET_ID) {
+        if (!vm.savedSchedulesEnabled || !SPREADSHEET_ID) {
+          vm.groupedSchedules = [];
+          vm.loading = false;
           return;
         }
         loadSchedules();
       }
 
       function loadSchedules() {
+        if (!vm.savedSchedulesEnabled) {
+          vm.groupedSchedules = [];
+          vm.loading = false;
+          return;
+        }
         vm.loading = true;
         return sheetsCall("list").then(
           function (res) {
@@ -194,7 +202,7 @@
       }
 
       function requestSave() {
-        if (!vm.selectedDateKey) {
+        if (!vm.savedSchedulesEnabled || !vm.selectedDateKey) {
           return;
         }
         vm.pendingAction = { type: "save" };
@@ -202,6 +210,9 @@
       }
 
       function requestDeleteDate(dateKey) {
+        if (!vm.savedSchedulesEnabled) {
+          return;
+        }
         vm.pendingAction = { type: "delete", dateKey: dateKey };
         openModal();
       }
@@ -410,6 +421,9 @@
       }
 
       function loadSavedDate(dateKey) {
+        if (!vm.savedSchedulesEnabled) {
+          return;
+        }
         vm.dateValue = parseDateKey(dateKey);
         $timeout(onDateChange);
       }
