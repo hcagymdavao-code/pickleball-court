@@ -83,6 +83,43 @@ textarea {
   flex-wrap: wrap;
 }
 
+.connection-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.connection-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f4b942;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+}
+
+.connection-status.online .connection-dot {
+  background: #2ecc71;
+  box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.18);
+}
+
+.connection-status.offline .connection-dot {
+  background: #e74c3c;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.16);
+}
+
+.connection-status.connecting .connection-dot {
+  background: #f4b942;
+  box-shadow: 0 0 0 3px rgba(244, 185, 66, 0.18);
+}
+
 .btn {
   border: 0;
   border-radius: 999px;
@@ -134,7 +171,7 @@ textarea {
   display: grid;
   grid-template-columns: 1fr;
   gap: 22px;
-  max-width: 1240px;
+  max-width: 1420px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -294,7 +331,32 @@ table.time-table {
 
 .court-cell {
   cursor: pointer;
-  width: 42%;
+  width: 45%;
+}
+
+.notes-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.court-clear {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(18, 38, 28, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.court-clear:hover {
+  background: rgba(192, 57, 43, 0.08);
+  transform: scale(1.02);
 }
 
 .court-cell.selected {
@@ -323,6 +385,14 @@ table.time-table {
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.92);
   color: var(--ink);
+}
+
+.table-wrap {
+  overflow: auto;
+  max-height: 68vh;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  width: 100%;
 }
 
 .court-cell:not(.selected) .notes-input {

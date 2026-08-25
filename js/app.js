@@ -49,8 +49,11 @@
       vm.groupedSchedules = [];
       vm.saving = false;
       vm.loading = false;
-      vm.savedSchedulesEnabled = false;
+      vm.savedSchedulesEnabled = true;
+      vm.savedSchedulesVisible = false;
       vm.sheetReady = !!SPREADSHEET_URL;
+      vm.sheetConnectionStatus = "connecting";
+      vm.sheetConnectionText = "Connecting";
       vm.accessError = "";
       vm.accessErrorTitle = "";
       vm.spreadsheetUrl = SPREADSHEET_URL;
@@ -58,6 +61,7 @@
 
       vm.onDateChange = onDateChange;
       vm.toggleCourt = toggleCourt;
+      vm.clearCourt = clearCourt;
       vm.onCourtInputClick = onCourtInputClick;
       vm.requestSave = requestSave;
       vm.requestDeleteDate = requestDeleteDate;
@@ -68,25 +72,51 @@
       boot();
 
       function boot() {
-        if (!vm.savedSchedulesEnabled || !SPREADSHEET_ID) {
+        setSheetConnectionStatus(WEB_APP_URL && navigator.onLine !== false ? "connecting" : "offline");
+
+        if (!WEB_APP_URL) {
+          vm.sheetReady = false;
           vm.groupedSchedules = [];
           vm.loading = false;
           return;
         }
+
+        if (!SPREADSHEET_ID) {
+          vm.sheetReady = false;
+          setSheetConnectionStatus("offline");
+          return;
+        }
+
         loadSchedules();
+        return checkSheetConnection();
+      }
+
+      function checkSheetConnection() {
+        if (!WEB_APP_URL || navigator.onLine === false) {
+          setSheetConnectionStatus("offline");
+          return Promise.resolve(false);
+        }
+
+        setSheetConnectionStatus("connecting");
+        return sheetsCall("list", { date: "0000-00-00" })
+          .then(function () {
+            setSheetConnectionStatus("online");
+            return true;
+          })
+          .catch(function () {
+            setSheetConnectionStatus("offline");
+            return false;
+          });
       }
 
       function loadSchedules() {
-        if (!vm.savedSchedulesEnabled) {
-          vm.groupedSchedules = [];
-          vm.loading = false;
-          return;
-        }
         vm.loading = true;
+        setSheetConnectionStatus("connecting");
         return sheetsCall("list").then(
           function (res) {
             if (res && res.ok) {
               applyLoaded(res.schedules || [], res);
+              setSheetConnectionStatus("online");
               return;
             }
             return loadFromShareLink();
@@ -107,9 +137,11 @@
           })
           .then(function (res) {
             applyLoaded(normalizeSheetRows(res.data));
+            setSheetConnectionStatus("online");
           })
           .catch(function () {
             applyLoaded([]);
+            setSheetConnectionStatus("offline");
           });
       }
 
@@ -122,6 +154,7 @@
           applyDateToSlots();
         }
         vm.loading = false;
+        setSheetConnectionStatus("online");
         if (scriptRes && !hasCurrentSchema(scriptRes)) {
           vm.accessErrorTitle = "Apps Script is still the old version";
           vm.accessError = outdatedScriptMessage();
@@ -142,7 +175,7 @@
         }
         return items.filter(function (item) {
           var date = String((item && item.date) || "").slice(0, 10);
-          var time = String((item && item.time) || "");
+          var time = extractStartTime(String((item && item.time) || ""));
           var timeLabel = String((item && item.timeLabel) || "");
           return (
             /^\d{4}-\d{2}-\d{2}$/.test(date) &&
@@ -194,6 +227,15 @@
         }
       }
 
+      function clearCourt(event, slot, courtId) {
+        if (event) {
+          event.stopPropagation();
+        }
+        var cell = slot.courts[courtId];
+        cell.selected = false;
+        cell.notes = "";
+      }
+
       function onCourtInputClick(event, slot, courtId) {
         event.stopPropagation();
         if (!slot.courts[courtId].selected) {
@@ -202,7 +244,7 @@
       }
 
       function requestSave() {
-        if (!vm.savedSchedulesEnabled || !vm.selectedDateKey) {
+        if (!vm.selectedDateKey) {
           return;
         }
         vm.pendingAction = { type: "save" };
@@ -319,7 +361,8 @@
         }
         return rows
           .map(function (row) {
-            var time = String(row.Time || row.time || "").slice(0, 5);
+            var rawTime = String(row.Time || row.time || row.Slot || row.slot || "");
+            var time = normalizeTimeValue(rawTime);
             var hour = Number(time.split(":")[0]);
             var court = String(row.Court || row.court || "1");
             if (court !== "2") {
@@ -328,7 +371,7 @@
             return {
               date: String(row.Date || row.date || "").slice(0, 10),
               time: time,
-              timeLabel: String(row.Slot || row.slot || row.timeLabel || ""),
+              timeLabel: String(row.Slot || row.slot || row.timeLabel || rawTime),
               court: court,
               courtLabel:
                 String(row["Court Label"] || row.courtLabel || "") ||
@@ -348,6 +391,21 @@
               item.timeLabel !== "Slot"
             );
           });
+      }
+
+      function normalizeTimeValue(value) {
+        return extractStartTime(String(value || "").trim());
+      }
+
+      function extractStartTime(value) {
+        var text = String(value || "").trim();
+        var match = text.match(/(\d{1,2}):(\d{2})/);
+        if (!match) {
+          return text;
+        }
+        var hour = Number(match[1]);
+        var minute = match[2];
+        return pad(hour) + ":" + minute;
       }
 
       function sheetsCall(action, extra) {
@@ -378,6 +436,7 @@
       }
 
       function rejected(message) {
+        setSheetConnectionStatus("offline");
         return {
           then: function (ok, fail) {
             if (fail) {
@@ -387,14 +446,21 @@
         };
       }
 
+      function setSheetConnectionStatus(status) {
+        var normalized = status === "online" || status === "offline" ? status : "connecting";
+        vm.sheetConnectionStatus = normalized;
+        vm.sheetConnectionText = normalized === "online" ? "Online" : normalized === "offline" ? "Offline" : "Connecting";
+      }
+
       function applyDateToSlots() {
         resetSlots();
         vm.schedules.forEach(function (item) {
           if (item.date !== vm.selectedDateKey) {
             return;
           }
+          var normalizedItemTime = normalizeTimeValue(item.time);
           vm.slots.forEach(function (slot) {
-            if (slot.time !== item.time) {
+            if (normalizeTimeValue(slot.time) !== normalizedItemTime) {
               return;
             }
             var court = item.court === "2" ? "2" : "1";
@@ -510,12 +576,13 @@
       }
 
       function formatHourEnd(hour) {
-        var suffix = hour >= 12 ? "PM" : "AM";
-        var display = hour % 12;
+        var endHour = (hour + 1) % 24;
+        var endSuffix = endHour >= 12 ? "PM" : "AM";
+        var display = endHour % 12;
         if (display === 0) {
           display = 12;
         }
-        return display + ":59 " + suffix;
+        return display + ":00 " + endSuffix;
       }
 
       function slotOrder(hour) {

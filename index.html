@@ -36,6 +36,10 @@
           Open Google Sheet
         </a>
       </div>
+      <div class="connection-status" ng-class="vm.sheetConnectionStatus">
+        <span class="connection-dot" aria-hidden="true"></span>
+        <span>{{ vm.sheetConnectionText }}</span>
+      </div>
     </header>
 
     <main class="layout">
@@ -107,14 +111,25 @@
                   ng-class="{ selected: slot.courts[court.id].selected }"
                   ng-click="vm.toggleCourt(slot, court.id)"
                 >
-                  <input
-                    class="notes-input"
-                    type="text"
-                    ng-model="slot.courts[court.id].notes"
-                    ng-readonly="!slot.courts[court.id].selected"
-                    ng-click="vm.onCourtInputClick($event, slot, court.id)"
-                    placeholder="{{ slot.courts[court.id].selected ? 'Add notes' : 'Click to reserve' }}"
-                  />
+                  <div class="notes-wrapper">
+                    <input
+                      class="notes-input"
+                      type="text"
+                      ng-model="slot.courts[court.id].notes"
+                      ng-readonly="!slot.courts[court.id].selected"
+                      ng-click="vm.onCourtInputClick($event, slot, court.id)"
+                      placeholder="{{ slot.courts[court.id].selected ? 'Add notes' : 'Click to reserve' }}"
+                    />
+                    <button
+                      type="button"
+                      class="court-clear"
+                      ng-if="slot.courts[court.id].selected"
+                      ng-click="vm.clearCourt($event, slot, court.id)"
+                      aria-label="Clear reservation for {{ court.name }} at {{ slot.label }}"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -122,7 +137,7 @@
         </div>
       </section>
 
-      <section class="card saved-card" ng-if="vm.savedSchedulesEnabled">
+      <section class="card saved-card" ng-if="vm.savedSchedulesVisible">
         <h2>Saved Schedules</h2>
         <p class="hint">
           Live data is stored in the
